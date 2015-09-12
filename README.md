@@ -1,2 +1,516 @@
 # Java-Projects
 Independent projects and coursework written in java
+///////////////////////////////////////////////////////////////////////////////
+//                   ALL STUDENTS COMPLETE THESE SECTIONS
+// Title:            Enigma
+// Files:            Enigma.java
+// Semester:         CS302 Spring 2015
+//
+// Author:           Kevin Bannerman
+// Email:            bannermanhut@wisc.edu
+// CS Login:         bannerman-hutchful
+// Lecturer's Name:  Deppler
+// Lab Section:      322
+//
+//////////////////// PAIR PROGRAMMERS COMPLETE THIS SECTION ////////////////////
+//
+//                   CHECK ASSIGNMENT PAGE TO see IF PAIR-PROGRAMMING IS ALLOWED
+//                   If pair programming is allowed:
+//                   1. Read PAIR-PROGRAMMING policy (in cs302 policy) 
+//                   2. choose a partner wisely
+//                   3. REGISTER THE TEAM BEFORE YOU WORK TOGETHER 
+//                      a. one partner creates the team
+//                      b. the other partner must join the team
+//                   4. complete this section for each program file.
+//
+// Pair Partner:     Amarah Sharif
+// Email:            ansharif@wisc.edu
+// CS Login:         amarah
+// Lecturer's Name:  Hobbes
+// Lab Section:      333
+//
+//////////////////// STUDENTS WHO GET HELP FROM OTHER THAN THEIR PARTNER //////
+//                   must fully acknowledge and credit those sources of help.
+//                   Instructors and TAs do not have to be credited here,
+//                   but tutors, roommates, relatives, strangers, etc do.
+//
+// Persons:          N/A
+//                   
+//
+// Online sources:   N/A
+//////////////////////////// 80 columns wide //////////////////////////////////
+
+import java.util.*;
+
+/**
+ * Simulate the encryption of messages that was performed by the 
+ * World War II-era German Enigma cipher machine.
+ * 
+ * <ul><li><a href="http://en.wikipedia.org/wiki/Enigma_machine" target="wiki">
+ * http://en.wikipedia.org/wiki/Enigma_machine</a></li>
+ * <li><a href="https://www.youtube.com/watch?v=G2_Q9FoD-oQ" target="youtube">
+ * https://www.youtube.com/watch?v=G2_Q9FoD-oQ</a></li>
+ * </ul>
+ */
+public class Enigma {
+
+	// CAUTION: YOU MAY NOT DECLARE STATIC FIELDS IN class Enigma
+	// All values must be passed (as described) to and from methods 
+	// as this is a major objective of this program assignment.
+
+	/**
+	 * User enter some initial configuration information and is then
+	 * prompted for the lines of text to be encrypted.
+	 * 
+	 * Each line is encrypted according to the rotor configuration.
+	 * The encoded line is displayed to the user.
+	 *
+	 * @param args UNUSED
+	 */
+	public static void main( String [] args ) { 
+
+
+		while (true){
+		
+		//Scanner connected to keyboard for reading user input
+		Scanner input = new Scanner(System.in);
+
+		//Prompts user to enter Rotor configuration and provi453es parameters
+		System.out.println("Willkommen auf der Enigma-Maschine");
+		System.out.println();
+		System.out.println("Please enter a Rotor Configuration.");
+		System.out.println("This must be a list of numbers in the range from 0"
+				+ " to " + (RotorConstants.ROTORS.length-1) + ", separated by "
+						+ "spaces.");
+		System.out.println("Note that rotor 0 is the identity rotor.");
+
+		//Reads line for rotor configuration
+		String rotConfig = input.nextLine(); 
+
+			//Stores Reflected Rotor
+			int [] reflectorRotor = convertRotor(RotorConstants.REFLECTOR);
+			
+			//Stores Parsed Rotor
+			int [] parsedRotors = parseRotorIndices(rotConfig);
+			
+			//Stores Rotor Setup
+			int [] [] rotorsInUse = setUpRotors(parsedRotors); 
+			
+			//Stores Rotor Notches (jagged array)
+			int [][] rotorNotches = getRotorNotches(parsedRotors);
+			
+			//Prompts user to enter code to be encrypted
+			System.out.println("Enter lines of text to be encoded: ");
+			
+			String plaintext = input.nextLine().toUpperCase();
+			//Converts string to upper case
+			
+			int [] offsets = new int [parsedRotors.length];
+
+			//new array to store plaintext entered
+			char [] plaintextChars = new char [plaintext.length()];
+			
+			//Stores each character in each index of array
+			for (int i = 0; i < plaintext.length(); i++){
+				plaintextChars[i] = plaintext.charAt(i);
+			}
+			//	System.out.print(plaintextChars);
+			System.out.print("Encoded result: ");
+			//new array to store encoded text 
+			char [] encodedplaintextChars = new char [plaintext.length()];	
+			for(int address = 0; address < plaintext.length(); address++){
+				//Ensures program doesn't attempt to encode non letters
+				
+				if(plaintextChars[address] >= 'A' && plaintextChars[address]
+						<= 'Z'){
+					//Encoded string stored in array
+					encodedplaintextChars[address] = encode(rotorsInUse, 
+							reflectorRotor, plaintextChars[address]);
+					advance(rotorsInUse, offsets, rotorNotches);
+				}
+				else encodedplaintextChars[address] = plaintextChars[address];
+			}
+			
+			System.out.println(encodedplaintextChars); 
+			System.out.println();
+		}
+		} 
+
+	/**
+	 * Rotates (advances) a single rotor by one position.
+	 * This is done by removing the first value of the array,
+	 * shifting all the other values towards the beginning of the array,
+	 * and placing the first value back into the array as the last value.
+	 *
+	 * @param rotor The rotor that must be rotated (or shifted).
+	 */
+	public static void rotate( int [] rotor ) {
+		//Left shift to all elements in rotor array when method is called
+		int length = RotorConstants.ROTOR_LENGTH;
+		int temp = rotor[0];
+		for(int i = 0; i < length-1;  i++){
+			rotor[i] = rotor[i+1];
+		}
+		rotor[length -1] = temp; 
+	}
+
+	/**
+	 * Parses (interprets) the rotor configuration string of integer values
+	 * and returns an integer array of those values.  
+
+	 * Example: If the input string is: 
+	 * <pre>"3 7 2"</pre>
+	 * The method returns an int array containing three indices: { 3, 7, 2 }.
+	 *
+	 * <h6>Parameter Validation</h6>
+	 * <blockquote>
+	 * <p>If any of the specified indices is not a valid index into the
+	 * {@code RotorConstants.ROTORS} array, the method prints: 
+	 * <pre>   Invalid rotor. You must enter an integer between 0 and 8.</pre> 
+	 * to {@code System.out} and then quits the program 
+	 * by calling {@code System.exit(-1)}.
+	 *
+	 * <p>The same rotor may not be used twice. If the user tries to specify 
+	 * the same rotor multiple more than once, this method prints:
+	 * <pre>  You cannot use the same rotor twice.</pre> to {@code System.out} 
+	 * and then quits the program by calling {@code System.exit(-1)}.
+	 * </blockquote>
+	 * 
+	 * @param rotorIndicesLine Text containing rotor index values separated
+	 *        by spaces.
+	 * @return Array of rotor index values.
+	 */
+	public static int [] parseRotorIndices( String rotorIndicesLine ) {
+
+		Scanner input = new Scanner(rotorIndicesLine);
+		
+		//Length of string entered divided by half discounts spaces
+		int parsedIndecesLine [] = new int [(rotorIndicesLine.length()/2) + 1];
+		//Validation to ensure at an integer is entered
+				if(!input.hasNextInt()){
+					System.out.println("You must specify at least one rotor.");
+					System.exit(-1);
+				}
+				// Stores user input in array without spaces
+		for(int i = 0; i < rotorIndicesLine.length(); i++){
+			if(input.hasNextInt()){
+				parsedIndecesLine [i] = input.nextInt(); 
+			}
+		}
+
+				int rotorconstantslength = RotorConstants.ROTORS.length;
+				for(int i = 0; i < parsedIndecesLine.length; i++){
+					if(parsedIndecesLine[i] < 0 ||parsedIndecesLine[i] >= 
+							rotorconstantslength ){
+						System.out.println("Invalid rotor. You must enter an "
+								+ "integer between 0 and " + 
+								(rotorconstantslength-1) + ".");
+						System.exit(-1);
+					}
+				}
+		
+				for(int i = 0; i < parsedIndecesLine.length; i++){
+					for(int j = i+1; j < parsedIndecesLine.length; j++){
+						if(parsedIndecesLine[i] == parsedIndecesLine[j]){
+							System.out.println("You cannot use the same"
+									+ " rotor twice.");
+							System.exit(-1);
+						}
+					}
+				}
+
+		return parsedIndecesLine;
+	}
+
+
+
+	/**
+	 * Creates and returns array of rotor ciphers, based on rotor indices.
+	 * 
+	 * The array of rotor ciphers returned is a 2D array, 
+	 * where each "row" of the array represents a given rotor's rotor cipher 
+	 * in integral form.
+	 * 
+	 * The number of rows is equal to the number of rotors in use, as
+	 * specified by the length of rotorIndices parameter.
+	 *
+	 * @param rotorIndices The indices of the rotors to use. Each value in this
+	 *        array should be a valid index into the
+	 *        {@code RotorConstants.ROTORS}array.
+	 *        
+	 * @return The array of rotors, each of which is itself an array of ints
+	 *         copied from {@code RotorConstants.ROTORS}.
+	 */
+	public static int [][] setUpRotors( int [] rotorIndices ) {
+		
+		//double array created to length of Rotor in Rotor Constants class
+		int [] [] rotorOrder = new int [rotorIndices.length] 
+				[RotorConstants.ROTOR_LENGTH];
+		for(int i = 0; i < rotorIndices.length; i++){
+			//convert method implemented on rotors then 2D array arranged
+			//with the rows representing the rotors and coloumns representing 
+			//its contents
+			rotorOrder[i] = 
+					convertRotor(RotorConstants.ROTORS[rotorIndices[i]]);
+		}
+
+		return rotorOrder;
+	}
+
+	/**
+	 * Creates and returns a 2D array containing the notch positions for 
+	 * each rotor being used.
+	 * 
+	 * <p>Each "row" of the array represents the notch positions of a single
+	 * rotor. A rotor may have more than one notch position, so each "row"
+	 * will contain one or more integers. There will be multiple rows, if
+	 * multiple rotors are in use.</p> 
+	 * 
+	 * <p>Note that this array may be jagged, since different rotors have 
+	 * different numbers of notch positions.</p>
+	 *
+	 * <p> <pre>
+	 *     Example:
+	 *     Input: [2, 1, 3]
+	 *     Output: a 2D Array that would look something like this:
+	 *            [[Array of notch positions of Rotor II],
+	 *             [Array of notch positions of Rotor I] ,
+	 *             [Array of notch positions of Rotor III]]</pre>
+	 *
+	 * @param rotorIndices Indices of the rotors. Each value in this
+	 *        array should be a valid index into the
+	 *        {@code RotorConstants.ROTORS} array.
+	 *        
+	 * @return An array containing the notch positions for each selected rotor.
+	 */
+	public static int [][] getRotorNotches( int[] rotorIndices ) {
+
+		//2D Array created to store notches that will form a jagged 2D array
+		int [][] notchSetup = new int [rotorIndices.length][];
+
+		for(int i = 0; i < rotorIndices.length; i++){
+			//Notches for each rotor indices is stored in array
+			notchSetup[i] = RotorConstants.NOTCHES[rotorIndices[i]];
+		}
+		return notchSetup;
+	}
+
+	/**
+	 * Converts a rotor cipher from its textual representation into an integer-
+	 * based rotor cipher. Each int would be in the range [0, 25], representing
+	 * the alphabetical index of the corresponding character.
+	 *
+	 * <p>The mapping of letters to integers works as follows: <br />
+	 * Each letter should be converted into its alphabetical index.
+	 * That is, 'A' maps to 0, 'B' maps to 1, etc. until 'Z', which maps to 25.
+	 *
+	 * <p><pre>
+	 * Example:
+	 * Input String: EKMFLGDQVZNTOWYHXUSPAIBRCJ
+	 * Output Array: [4 10 12 5 11 6 3 16 21 25 13 19 14 22 24 7 23 20 18 15 0
+	 *                8 1 17 2 9]</pre>
+	 *
+	 * @param rotorText Text representation of the rotor. This will be like
+	 *        the Strings in {@code RotorConstants.ROTORS}; that is, it will be
+	 *        a String containing all 26 upper-case letters.
+	 *        
+	 * @return array of values between 0 and 25, inclusive that represents the
+	 *        integer index value of each character.
+	 */
+	public static int [] convertRotor( String rotorText ) {
+		int i;
+		
+		//Array created to the length of Rotor from Rotor Constants class
+		int [] convertedRotorText = new int [RotorConstants.ROTOR_LENGTH];
+
+		for(i=0; i < rotorText.length(); i++ ){
+			//Value of character stored in each index of array to get letter
+			//index. Eg. If E is entered E(69) - A(65) = 4
+			convertedRotorText[i] = rotorText.charAt(i)- 'A';
+		}
+		return convertedRotorText;
+	} 
+
+	/**
+	 * Encodes a single uppercase character according to the current
+	 * state of the Enigma encoding rotors.
+	 *
+	 * <p>To do this:
+	 * <ol><li>Convert input character to its alphabetical index, 
+	 * e.g. 'A' would be 0, 'B' would be 1, etc.</li>
+	 * <li>Run the letter through the rotors in forward order.</li>
+	 * </ol>
+	 * 
+	 * <p>To "run character through rotors", use your converted-letter as the
+	 * index into the desired row of the rotors array. 
+	 * Then, apply the reflector, and run the letter through the rotors again, 
+	 * but in reverse. Encoding in reverse not only implies that the 
+	 * rotor-order is to be reversed. It also means that each cipher
+	 * is applied in reverse.</p>
+	 * 
+	 * An example:
+	 * <pre>
+	 *      Cipher (input):     EKMFLGDQVZNTOWYHXUSPAIBRCJ
+	 *      Alphabet (output):  ABCDEFGHIJKLMNOPQRSTUVWXYZ
+	 * </pre>
+	 * While encoding in reverse, 'E' would get encoded as 'A', 'K' as 'B',
+	 * etc. (In the forward direction, 'E' would get encoded as 'L')
+	 *
+	 * Finally, convert your letter integer index value back to a 
+	 * traditional character value.
+	 *
+	 * @param rotors Current configuration of rotor ciphers, each in
+	 *         integral rotor cipher form. Each "row" of this array represents
+	 *         a rotor cipher.
+	 *         
+	 * @param reflector The special reflector rotor in integral rotor cipher
+	 *         form.
+	 *         
+	 * @param input The character to be encoded. Must be an upper-case 
+	 * letter. DO NOT CONVERT TO UPPERCASE HERE.
+	 * 
+	 * @return The result of encoding the input character. ALL encoded 
+	 *         characters are upper-case.
+	 */
+	public static char encode( int [][] rotors, int [] reflector, char input ) {
+
+
+		//Initialize variable for reverse encryption
+		int reverseEncryption = 0;
+		
+		//Initiate alphabet index of first character that is intered
+		int alphaIndex = (input - 65); 
+		int i, j; // Initialized to be used as counts
+		int encodedChar = alphaIndex;
+		
+		//Forward encryption. Passes letter through each rotor for the length 
+		//the string entered. Index of letter indicates the letter index on
+		//the next cipher that should be used for encryption
+		for(i = 0; i < rotors.length; i++){
+			encodedChar	= rotors[i][encodedChar];
+		} 
+		
+		//Variable stores final forward encryption after it is passed through
+		//reflector
+		reverseEncryption   = reflector[encodedChar];
+
+		//	System.out.println(reflectedChar); // test reflected char
+
+		for(j = rotors.length-1; j >= 0; j--){	
+			//Variable stores reversed encryption. Cypher is applied in reverse
+			//hence the decrementing variable counter j
+			reverseEncryption = reverseEncode(rotors[j], reverseEncryption);
+
+		}
+		
+		//converted to traditional character value
+		return (char)(reverseEncryption + 65 );
+		
+	}
+	
+	/**
+	 * This method performs reverse encryption. It checks condition to see if
+	 * character the reflected character has the same index value as
+	 * original arrays equivalent letter index
+	 * 
+	 * @param array Uses the rotor array to determine)
+	 * @param character (Do the same for each additional parameter)
+	 * @return Returns encryption after passing through array order in
+	 * reverse
+	 */
+	private static int reverseEncode(int [] array, int character){
+		int reverseChar = 0;
+		for(int k = 0; k < array.length; k++){
+			//compares index value of character with position in array
+			if(array[k] == character ){ 
+				reverseChar = k;
+			}
+		}
+		return  reverseChar;
+	}
+
+	/**
+	 * Advances the rotors.  (Always advances rotor at index 0. May also
+	 * advance other rotors depending upon notches that are reached.)
+	 *
+	 * <ol><li> Advancement takes place, starting at rotor at index 0. </li>
+	 * <li>The 0th rotor is rotated</li>
+	 * <li>Update the corresponding offset in <tt>rotorOffsets.</tt></li>
+	 * <li>Check to see if the current offset matches a notch
+	 * (meaning that a notch has been reached). </li>
+	 * <li>If a notch has been reached:
+	 * <ol><li>The next rotor must also be advanced</li>
+	 *     <li>And have its rotorOffset updated.</li>
+	 *     <li>And if a notch is reached, the next rotor is advanced.</li>
+	 *     </ol>
+	 * <li>Otherwise, notch was not reached, so no further rotors are
+	 *  advanced.</li>
+	 * </ol>
+	 *
+	 * <p>Advancement halts when a <tt>rotorOffset</tt> is updated and
+	 * it does not reach a notch for that rotor.</p>
+	 * 
+	 * Note: The reflector never advances, it always stays stationary.
+	 *
+	 * @param rotors The array of rotor ciphers in their current configuration.
+	 *         The rotor at index 0 is the first rotor to be considered for
+	 *         advancement. It will always rotate exactly once. The remaining
+	 *         rotors may advance when notches on earlier rotors are reach.
+	 *         Later rotors will not not advance as often unless there is a 
+	 *         notch at each index. (Tip: We try such a configuration during 
+	 *         testing). The data in this array will be updated to show the 
+	 *         rotors' new positions.
+	 *         
+	 * @param rotorOffsets The current offsets by which the rotors have been
+	 *        rotated. These keep track of how far each rotor has rotated since
+	 *        the beginning of the program. The offset at index i will
+	 *        correspond to rotor at index 0 of rotors. e.g. offset 0 pertains
+	 *        to the 0th rotor cipher in rotors.
+	 *        Will be updated in-place to reflect the new offsets after
+	 *        advancing.  The offsets are compared to notches to know when
+	 *        next rotor must also be advanced.
+	 *        
+	 * @param rotorNotches The positions of the notches on each of the rotors.
+	 *        Each row of this array represents the notches of a certain rotor.
+	 *        The ith row will correspond to the notches of the ith rotor
+	 *        cipher in rotors.  Only when a rotor advances to its notched 
+	 *        position does the next rotor in the chain advance.
+	 */
+	public static void advance( int [][] rotors, int [] rotorOffsets,
+			int [][] rotorNotches)
+	{
+		// Condition to initiate do-while loop
+		boolean notched = false;
+		int i = 0;
+		do{
+			
+			rotate(rotors[i]);    //Rotates rotors at i
+			rotorOffsets[i]++;	  //Increments offset
+			
+			if(rotorOffsets[i] == RotorConstants.ROTOR_LENGTH){
+				rotorOffsets[i] = 0; //Resets offset when it reaches 26
+			}
+			notched = false; //Notched is false so loop begins
+			for(int j = 0; j < rotorNotches[i].length; j++){
+				//Condition is set to true when offsets is equal to Notch
+			if(rotorOffsets[i] == rotorNotches[i][j]){ 
+			notched = true;  //Notched is  true when condition is met
+			}	
+			}
+			i++;
+			
+	
+		}
+		//Perform while notches have condition is true and count is less than 
+		//length of rotors array
+		while(notched && i < rotors.length);
+
+	} 
+	
+	
+
+} // end of Enigma class 
+
+
+
+	
